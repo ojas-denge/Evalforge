@@ -1,0 +1,74 @@
+from app.evaluation import EvaluationDataset
+from app.evaluator import Evaluator
+
+
+def main() -> None:
+    dataset = EvaluationDataset.load()
+    evaluator = Evaluator()
+
+    run = evaluator.evaluate_dataset(dataset)
+
+    print("=" * 80)
+    print("EVALFORGE RETRIEVAL EVALUATION")
+    print("=" * 80)
+
+    print(f"Run ID:  {run.run_id}")
+    print(f"Dataset: {run.dataset_size} cases")
+    print()
+
+    for result in run.results:
+        print("-" * 80)
+        print(f"Case: {result.case_id}")
+        print(f"Question: {result.question}")
+
+        print(
+            "Expected:  "
+            + ", ".join(result.expected_documents)
+        )
+
+        print("Retrieved:")
+
+        for evidence in result.retrieved_evidence:
+            print(
+                f"  {evidence.rank}. "
+                f"{evidence.document_id} "
+                f"(distance={evidence.distance:.4f})"
+            )
+
+        print(
+            f"Hit@1={result.hit_at_1:.1f} "
+            f"Hit@3={result.hit_at_3:.1f} "
+            f"Hit@5={result.hit_at_5:.1f}"
+        )
+
+        print(
+            f"Recall@1={result.recall_at_1:.2f} "
+            f"Recall@3={result.recall_at_3:.2f} "
+            f"Recall@5={result.recall_at_5:.2f}"
+        )
+        
+        print(f"MRR={result.mrr:.3f}")
+
+        print(
+            f"Latency={result.retrieval_latency_ms:.2f} ms"
+        )
+
+    print("=" * 80)
+    print("AGGREGATE METRICS")
+    print("=" * 80)
+
+    print(f"Mean Hit@1:    {run.mean_hit_at_1:.3f}")
+    print(f"Mean Hit@3:    {run.mean_hit_at_3:.3f}")
+    print(f"Mean Hit@5:    {run.mean_hit_at_5:.3f}")
+
+    print(f"Mean Recall@1: {run.mean_recall_at_1:.3f}")
+    print(f"Mean Recall@3: {run.mean_recall_at_3:.3f}")
+    print(f"Mean Recall@5: {run.mean_recall_at_5:.3f}")
+
+    print(f"Mean MRR:      {run.mean_mrr:.3f}")
+
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    main()

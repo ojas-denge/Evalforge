@@ -1,0 +1,243 @@
+[
+  {
+    "case_id": "routing_001",
+    "question": "How does EvalForge decide which language model should handle a request?",
+    "expected_answer": "Model selection should consider task complexity, latency, reliability, and cost.",
+    "expected_documents": [
+      "architecture/model-routing.md"
+    ],
+    "expected_topics": [
+      "model routing",
+      "task complexity",
+      "latency",
+      "reliability",
+      "cost"
+    ],
+    "category": "routing",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "routing_002",
+    "question": "Why wouldn't every request be sent to the most capable model?",
+    "expected_answer": "A simple request does not necessarily require the most capable model, and model selection should consider factors such as complexity, latency, reliability, and cost.",
+    "expected_documents": [
+      "architecture/model-routing.md"
+    ],
+    "expected_topics": [
+      "model capability",
+      "task complexity",
+      "latency",
+      "cost"
+    ],
+    "category": "routing",
+    "difficulty": "medium"
+  },
+  {
+    "case_id": "routing_003",
+    "question": "What can change when the model used for a request is changed?",
+    "expected_answer": "Changing the model can affect answer quality, latency, token usage, and cost.",
+    "expected_documents": [
+      "architecture/model-routing.md"
+    ],
+    "expected_topics": [
+      "model changes",
+      "answer quality",
+      "latency",
+      "token usage",
+      "cost"
+    ],
+    "category": "routing",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "retrieval_001",
+    "question": "What retrieval approach does the baseline implementation use?",
+    "expected_answer": "The baseline retrieval implementation uses semantic similarity search.",
+    "expected_documents": [
+      "engineering/retrieval-guidelines.md"
+    ],
+    "expected_topics": [
+      "semantic similarity",
+      "retrieval"
+    ],
+    "category": "retrieval",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "retrieval_002",
+    "question": "What trade-off comes from increasing top-k?",
+    "expected_answer": "Increasing top-k can improve recall when relevant information is distributed across multiple chunks, but excessive context can introduce irrelevant information and increase generation cost.",
+    "expected_documents": [
+      "engineering/retrieval-guidelines.md"
+    ],
+    "expected_topics": [
+      "top-k",
+      "recall",
+      "context",
+      "generation cost"
+    ],
+    "category": "retrieval",
+    "difficulty": "medium"
+  },
+  {
+    "case_id": "retrieval_003",
+    "question": "When should retrieval quality be measured separately from the final answer?",
+    "expected_answer": "Retrieval quality should be evaluated independently from final answer quality so that retrieval failures can be distinguished from failures in the final answer.",
+    "expected_documents": [
+      "engineering/retrieval-guidelines.md"
+    ],
+    "expected_topics": [
+      "retrieval quality",
+      "answer quality",
+      "retrieval evaluation"
+    ],
+    "category": "retrieval",
+    "difficulty": "medium"
+  },
+  {
+    "case_id": "latency_001",
+    "question": "What is the performance target for a normal EvalForge query?",
+    "expected_answer": "The target baseline for a normal query is a p95 latency below 2500 milliseconds.",
+    "expected_documents": [
+      "operations/latency-policy.md"
+    ],
+    "expected_topics": [
+      "p95",
+      "latency",
+      "2500 milliseconds"
+    ],
+    "category": "latency",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "latency_002",
+    "question": "When is latency considered a regression under the baseline policy?",
+    "expected_answer": "A p95 latency above 2500 milliseconds is considered a performance regression for the baseline application.",
+    "expected_documents": [
+      "operations/latency-policy.md"
+    ],
+    "expected_topics": [
+      "p95",
+      "performance regression",
+      "latency threshold"
+    ],
+    "category": "latency",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "cost_001",
+    "question": "Which token measurements does EvalForge track for LLM requests?",
+    "expected_answer": "Input and output tokens are tracked separately.",
+    "expected_documents": [
+      "operations/cost-policy.md"
+    ],
+    "expected_topics": [
+      "input tokens",
+      "output tokens",
+      "token usage"
+    ],
+    "category": "cost",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "cost_002",
+    "question": "Why can't a cheaper model automatically be considered an improvement?",
+    "expected_answer": "A lower cost is not automatically an improvement if answer quality decreases, so cost optimization must be evaluated together with quality metrics and latency.",
+    "expected_documents": [
+      "operations/cost-policy.md"
+    ],
+    "expected_topics": [
+      "cost",
+      "answer quality",
+      "latency",
+      "optimization"
+    ],
+    "category": "cost",
+    "difficulty": "medium"
+  },
+  {
+    "case_id": "validation_001",
+    "question": "What happens when an LLM produces malformed structured output?",
+    "expected_answer": "Malformed structured output must not be silently accepted. Validation failures should be recorded and may trigger a retry or repair operation.",
+    "expected_documents": [
+      "policies/validation-policy.md"
+    ],
+    "expected_topics": [
+      "structured output",
+      "validation",
+      "retry",
+      "repair"
+    ],
+    "category": "validation",
+    "difficulty": "medium"
+  },
+  {
+    "case_id": "validation_002",
+    "question": "What range is allowed for confidence values in generated responses?",
+    "expected_answer": "Confidence values must be between zero and one.",
+    "expected_documents": [
+      "policies/validation-policy.md"
+    ],
+    "expected_topics": [
+      "confidence",
+      "validation",
+      "structured response"
+    ],
+    "category": "validation",
+    "difficulty": "easy"
+  },
+  {
+    "case_id": "cross_001",
+    "question": "If changing the model can affect latency and cost, what should be used to determine whether the change is actually better?",
+    "expected_answer": "Model changes should be evaluated against a fixed evaluation dataset, and cost and latency should be evaluated together with answer quality.",
+    "expected_documents": [
+      "architecture/model-routing.md",
+      "operations/cost-policy.md",
+      "operations/latency-policy.md"
+    ],
+    "expected_topics": [
+      "model changes",
+      "evaluation dataset",
+      "answer quality",
+      "cost",
+      "latency"
+    ],
+    "category": "cross_document",
+    "difficulty": "hard"
+  },
+  {
+    "case_id": "cross_002",
+    "question": "How does the retrieval layer fit into the overall EvalForge architecture, and how should retrieval quality be assessed?",
+    "expected_answer": "The retrieval layer searches the indexed knowledge base and provides relevant context to the generation layer. Retrieval quality should be evaluated independently from final answer quality.",
+    "expected_documents": [
+      "architecture/system-architecture.md",
+      "engineering/retrieval-guidelines.md"
+    ],
+    "expected_topics": [
+      "retrieval layer",
+      "knowledge base",
+      "generation layer",
+      "retrieval evaluation"
+    ],
+    "category": "cross_document",
+    "difficulty": "hard"
+  },
+  {
+    "case_id": "cross_003",
+    "question": "What does a successful LLM call fail to guarantee, and what system components are responsible for checking the result?",
+    "expected_answer": "A successful LLM call does not imply that the output is valid. The validation layer verifies that generated responses conform to required schemas and application constraints.",
+    "expected_documents": [
+      "architecture/system-architecture.md",
+      "policies/validation-policy.md"
+    ],
+    "expected_topics": [
+      "LLM call",
+      "output validation",
+      "validation layer",
+      "schemas",
+      "application constraints"
+    ],
+    "category": "cross_document",
+    "difficulty": "hard"
+  }
+]
