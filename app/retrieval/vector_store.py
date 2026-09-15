@@ -104,3 +104,22 @@ class VectorStore:
 
     def count(self) -> int:
         return self.collection.count()
+
+    def all_chunks(self) -> list[dict]:
+        results = self.collection.get(
+            include=["documents", "metadatas"],
+        )
+
+        return [
+            {
+                "chunk_id": chunk_id,
+                "document": document,
+                "metadata": metadata,
+                "distance": None,
+            }
+            for chunk_id, document, metadata in zip(
+                results.get("ids", []),
+                results.get("documents", []),
+                results.get("metadatas", []),
+            )
+        ]

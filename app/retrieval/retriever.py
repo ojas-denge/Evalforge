@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from time import perf_counter
 
+from app.core.config import get_settings
 from app.retrieval.embeddings import EmbeddingService
+from app.retrieval.lexical import BM25Retriever
+from app.retrieval.reranker import CrossEncoderReranker, Reranker
 from app.retrieval.vector_store import VectorStore
 
 
@@ -11,7 +14,7 @@ class RetrievedDocument:
     chunk_id: str
     document_id: str
     text: str
-    distance: float
+    distance: float | None
 
 
 @dataclass(frozen=True)
@@ -26,13 +29,60 @@ class Retriever:
         self,
         embedding_service: EmbeddingService | None = None,
         vector_store: VectorStore | None = None,
+        reranker: Reranker | None = None,
+        reranking_enabled: bool | None = None,
+        reranker_candidate_k: int | None = None,
+        hybrid_retrieval_enabled: bool | None = None,
+        lexical_retriever: BM25Retriever | None = None,
     ) -> None:
+        settings = get_settings()
+
         self.embedding_service = (
             embedding_service or EmbeddingService()
         )
         self.vector_store = (
             vector_store or VectorStore()
         )
+        self.reranking_enabled = (
+            reranking_enabled
+            if reranking_enabled is not None
+            else settings.reranking_enabled
+        )
+        self.reranker_candidate_k = (
+            reranker_candidate_k
+            if reranker_candidate_k is not None
+            else settings.reranker_candidate_k
+        )
+        self.hybrid_retrieval_enabled = (
+            hybrid_retrieval_enabled
+            if hybrid_retrieval_enabled is not None
+            else settings.hybrid_retrieval_enabled
+        )
+        self.lexical_candidate_k = settings.lexical_candidate_k
+        self.lexical_retriever = lexical_retriever or BM25Retriever()
+
+        if self.reranker_candidate_k <= 0:
+            raise ValueError(
+                "reranker_candidate_k must be greater than zero"
+            )
+
+        if reranker is not None:
+            self.reranker = reranker
+            self.reranking_enabled = True
+        elif self.reranking_enabled:
+            self.reranker = CrossEncoderReranker(
+                settings.reranker_model
+            )
+        else:
+            self.reranker = None
+
+    @property
+    def mode(self) -> str:
+        if self.hybrid_retrieval_enabled and self.reranking_enabled:
+            return "hybrid_reranked"
+        if self.hybrid_retrieval_enabled:
+            return "hybrid"
+        return "dense_reranked" if self.reranking_enabled else "dense"
 
     def retrieve(
         self,
@@ -45,10 +95,50 @@ class Retriever:
             query
         )
 
-        raw_results = self.vector_store.search(
+        candidate_k = top_k
+        if self.reranking_enabled:
+            candidate_k = max(top_k, self.reranker_candidate_k)
+
+        dense_results = self.vector_store.search(
             query_embedding=query_embedding,
-            top_k=top_k,
+            top_k=candidate_k,
         )
+
+        raw_results = dense_results
+        if self.hybrid_retrieval_enabled:
+            lexical_results = self.lexical_retriever.search(
+                query,
+                self.vector_store.all_chunks(),
+                top_k=self.lexical_candidate_k,
+            )
+            raw_results = self._fuse_candidates(
+                dense_results,
+                lexical_results,
+            )
+
+        if self.reranker is not None:
+            scores = self.reranker.score(
+                query,
+                [result["document"] for result in raw_results],
+            )
+
+            if len(scores) != len(raw_results):
+                raise ValueError(
+                    "Reranker must return one score per candidate"
+                )
+
+            raw_results = [
+                result
+                for _, result in sorted(
+                    enumerate(raw_results),
+                    key=lambda candidate: (
+                        -scores[candidate[0]],
+                        candidate[0],
+                    ),
+                )[:top_k]
+            ]
+        else:
+            raw_results = raw_results[:top_k]
 
         results = [
             RetrievedDocument(
@@ -71,3 +161,26 @@ class Retriever:
             results=results,
             latency_ms=latency_ms,
         )
+
+    @staticmethod
+    def _fuse_candidates(
+        dense_results: list[dict],
+        lexical_results: list[dict],
+    ) -> list[dict]:
+        candidates: dict[str, tuple[float, dict]] = {}
+        for results in (dense_results, lexical_results):
+            for rank, result in enumerate(results, start=1):
+                chunk_id = result["chunk_id"]
+                score, existing = candidates.get(chunk_id, (0.0, result))
+                candidates[chunk_id] = (
+                    score + 1.0 / (60 + rank),
+                    existing,
+                )
+
+        return [
+            result
+            for _, result in sorted(
+                candidates.values(),
+                key=lambda item: (-item[0], item[1]["chunk_id"]),
+            )
+        ]

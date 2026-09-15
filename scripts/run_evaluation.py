@@ -14,6 +14,7 @@ def main() -> None:
 
     print(f"Run ID:  {run.run_id}")
     print(f"Dataset: {run.dataset_size} cases")
+    print(f"Retriever: {evaluator.retriever.mode}")
     print()
 
     for result in run.results:
@@ -33,7 +34,27 @@ def main() -> None:
                 f"  {evidence.rank}. "
                 f"{evidence.document_id} "
                 f"(distance={evidence.distance:.4f})"
+                if evidence.distance is not None
+                else "(lexical candidate)"
             )
+
+        print(f"Diagnostic: {result.failure_type}")
+        print(
+            "Relevant evidence found: "
+            f"{'YES' if result.relevant_documents_found else 'NO'}"
+        )
+        print(
+            "First relevant rank: "
+            f"{result.first_relevant_rank or 'N/A'}"
+        )
+        print(
+            "Missing documents: "
+            + (", ".join(result.missing_documents) or "None")
+        )
+        print(
+            "Confounding documents: "
+            + (", ".join(result.confounding_documents) or "None")
+        )
 
         print(
             f"Hit@1={result.hit_at_1:.1f} "
@@ -66,6 +87,10 @@ def main() -> None:
     print(f"Mean Recall@5: {run.mean_recall_at_5:.3f}")
 
     print(f"Mean MRR:      {run.mean_mrr:.3f}")
+    print(
+        "Mean retrieval latency: "
+        f"{run.mean_retrieval_latency_ms:.2f} ms"
+    )
 
     print("=" * 80)
 

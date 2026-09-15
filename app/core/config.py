@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4.1-mini"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
 
+    chunk_size: int = 120
+    chunk_overlap: int = 30
+    retrieval_top_k: int = 5
+    reranking_enabled: bool = False
+    reranker_candidate_k: int = 10
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    hybrid_retrieval_enabled: bool = False
+    lexical_candidate_k: int = 10
+
     chroma_host: str = "localhost"
     chroma_port: int = 8000
 

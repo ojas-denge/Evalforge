@@ -22,7 +22,7 @@ class RetrievedEvidence(BaseModel):
     rank: int = Field(ge=1)
     chunk_id: str = Field(min_length=1)
     document_id: str = Field(min_length=1)
-    distance: float = Field(ge=0.0)
+    distance: float | None = Field(default=None, ge=0.0)
     text: str = Field(min_length=1)
 
 
@@ -37,6 +37,15 @@ class EvaluationResult(BaseModel):
     retrieved_evidence: list[RetrievedEvidence] = Field(
         default_factory=list
     )
+
+    failure_type: str = Field(min_length=1)
+    relevant_documents_found: bool
+    first_relevant_rank: int | None = Field(
+        default=None,
+        ge=1,
+    )
+    missing_documents: list[str] = Field(default_factory=list)
+    confounding_documents: list[str] = Field(default_factory=list)
 
     hit_at_1: float = Field(ge=0.0, le=1.0)
     hit_at_3: float = Field(ge=0.0, le=1.0)
@@ -90,3 +99,4 @@ class EvaluationRun(BaseModel):
     )
 
     mean_mrr: float = Field(ge=0.0, le=1.0)
+    mean_retrieval_latency_ms: float = Field(ge=0.0)

@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from app.evaluation import EvaluationDataset
+from app.evaluation_diagnostics import analyze_retrieval
 from app.evaluation_metrics import (
     hit_at_k,
     recall_at_k,
@@ -46,11 +47,23 @@ class Evaluator:
             for evidence in retrieved_evidence
         ]
 
+        diagnostic = analyze_retrieval(
+            case.expected_documents,
+            retrieved_documents,
+        )
+
         return EvaluationResult(
             case_id=case.case_id,
             question=case.question,
             expected_documents=case.expected_documents,
             retrieved_evidence=retrieved_evidence,
+            failure_type=diagnostic.failure_type,
+            relevant_documents_found=(
+                diagnostic.relevant_documents_found
+            ),
+            first_relevant_rank=diagnostic.first_relevant_rank,
+            missing_documents=diagnostic.missing_documents,
+            confounding_documents=diagnostic.confounding_documents,
             hit_at_1=hit_at_k(
                 case.expected_documents,
                 retrieved_documents,
@@ -133,6 +146,11 @@ class Evaluator:
                 for result in results
             ) / len(results)
 
+            mean_retrieval_latency_ms = sum(
+                result.retrieval_latency_ms
+                for result in results
+            ) / len(results)
+
         else:
             mean_hit_at_1 = 0.0
             mean_hit_at_3 = 0.0
@@ -141,6 +159,7 @@ class Evaluator:
             mean_recall_at_3 = 0.0
             mean_recall_at_5 = 0.0
             mean_mrr = 0.0
+            mean_retrieval_latency_ms = 0.0
 
         return EvaluationRun(
             run_id=str(uuid4()),
@@ -153,4 +172,5 @@ class Evaluator:
             mean_recall_at_3=mean_recall_at_3,
             mean_recall_at_5=mean_recall_at_5,
             mean_mrr=mean_mrr,
+            mean_retrieval_latency_ms=mean_retrieval_latency_ms,
         )

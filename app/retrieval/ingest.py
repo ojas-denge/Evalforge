@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.retrieval.chunking import DocumentChunk, chunk_text
 
@@ -12,6 +13,8 @@ SUPPORTED_EXTENSIONS = {".md", ".txt"}
 def load_documents(
     documents_path: str = "data/documents",
 ) -> list[DocumentChunk]:
+    settings = get_settings()
+
     root = Path(documents_path)
 
     if not root.exists():
@@ -44,6 +47,8 @@ def load_documents(
         document_chunks = chunk_text(
             text=text,
             document_id=document_id,
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
         )
 
         chunks.extend(document_chunks)
