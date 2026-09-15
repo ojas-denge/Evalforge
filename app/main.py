@@ -5,13 +5,14 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models.schemas import QueryRequest, QueryResponse
+from app.retrieval.retriever import Retriever
 
 
 settings = get_settings()
-
 configure_logging(settings.log_level)
-
 logger = get_logger(__name__)
+
+retriever = Retriever()
 
 
 @asynccontextmanager
@@ -22,9 +23,7 @@ async def lifespan(app: FastAPI):
         settings.app_version,
         settings.app_env,
     )
-
     yield
-
     logger.info("Shutting down %s", settings.app_name)
 
 
@@ -39,7 +38,6 @@ app = FastAPI(
 @app.get("/health")
 def health_check():
     logger.info("Health check requested")
-
     return {
         "status": "ok",
         "service": settings.app_name.lower(),
@@ -49,13 +47,26 @@ def health_check():
 
 @app.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest):
-    logger.info("Query received")
+    logger.info(
+        "Query received: %s",
+        request.question,
+    )
+
+    retrieval = retriever.retrieve(
+        query=request.question,
+        top_k=3,
+    )
+
+    citations = [
+        result.document_id
+        for result in retrieval.results
+    ]
 
     return QueryResponse(
-        answer="RAG pipeline not implemented yet.",
-        citations=[],
+        answer="Retrieval successful. Generation not implemented yet.",
+        citations=citations,
         confidence=0.0,
-        latency_ms=0.0,
+        latency_ms=retrieval.latency_ms,
         input_tokens=0,
         output_tokens=0,
         estimated_cost_usd=0.0,

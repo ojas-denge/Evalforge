@@ -4,21 +4,21 @@ from app.retrieval.retriever import Retriever
 def main() -> None:
     retriever = Retriever()
 
-    results = retriever.retrieve(
+    result = retriever.retrieve(
         "How does model routing work?",
         top_k=3,
     )
 
     print("Retriever OK")
+    print(f"Query: {result.query}")
+    print(f"Latency: {result.latency_ms:.2f} ms")
     print()
 
-    for rank, result in enumerate(results, start=1):
-        document_id = result["metadata"]["document_id"]
-        distance = result["distance"]
-
+    for document in result.results:
         print(
-            f"{rank}. {document_id} | "
-            f"distance={distance:.4f}"
+            f"{document.rank}. "
+            f"{document.document_id} | "
+            f"distance={document.distance:.4f}"
         )
 
 
