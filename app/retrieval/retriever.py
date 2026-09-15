@@ -34,36 +34,49 @@ class Retriever:
         reranker_candidate_k: int | None = None,
         hybrid_retrieval_enabled: bool | None = None,
         lexical_retriever: BM25Retriever | None = None,
+        lexical_only: bool = False,
+        candidate_k: int | None = None,
     ) -> None:
         settings = get_settings()
 
-        self.embedding_service = (
-            embedding_service or EmbeddingService()
-        )
-        self.vector_store = (
-            vector_store or VectorStore()
-        )
+        self.lexical_only = lexical_only
+        self.vector_store = vector_store or VectorStore()
+
         self.reranking_enabled = (
             reranking_enabled
             if reranking_enabled is not None
             else settings.reranking_enabled
         )
+
         self.reranker_candidate_k = (
             reranker_candidate_k
             if reranker_candidate_k is not None
             else settings.reranker_candidate_k
         )
+
         self.hybrid_retrieval_enabled = (
             hybrid_retrieval_enabled
             if hybrid_retrieval_enabled is not None
             else settings.hybrid_retrieval_enabled
         )
+
         self.lexical_candidate_k = settings.lexical_candidate_k
         self.lexical_retriever = lexical_retriever or BM25Retriever()
 
+        self.candidate_k = candidate_k
+
         if self.reranker_candidate_k <= 0:
-            raise ValueError(
-                "reranker_candidate_k must be greater than zero"
+            raise ValueError("reranker_candidate_k must be greater than zero")
+
+        if self.candidate_k is not None and self.candidate_k <= 0:
+            raise ValueError("candidate_k must be greater than zero")
+
+        # BM25-only retrieval does not need embeddings.
+        if self.lexical_only:
+            self.embedding_service = None
+        else:
+            self.embedding_service = (
+                embedding_service or EmbeddingService()
             )
 
         if reranker is not None:
@@ -78,43 +91,57 @@ class Retriever:
 
     @property
     def mode(self) -> str:
+        if self.lexical_only:
+            return "bm25"
+
         if self.hybrid_retrieval_enabled and self.reranking_enabled:
             return "hybrid_reranked"
+
         if self.hybrid_retrieval_enabled:
             return "hybrid"
-        return "dense_reranked" if self.reranking_enabled else "dense"
 
-    def retrieve(
-        self,
-        query: str,
-        top_k: int = 5,
-    ) -> RetrievalResult:
+        if self.reranking_enabled:
+            return "dense_reranked"
+
+        return "dense"
+
+    def retrieve(self, query: str, top_k: int = 5) -> RetrievalResult:
         start_time = perf_counter()
 
-        query_embedding = self.embedding_service.embed_query(
-            query
-        )
+        candidate_k = self._resolve_candidate_k(top_k)
 
-        candidate_k = top_k
-        if self.reranking_enabled:
-            candidate_k = max(top_k, self.reranker_candidate_k)
-
-        dense_results = self.vector_store.search(
-            query_embedding=query_embedding,
-            top_k=candidate_k,
-        )
-
-        raw_results = dense_results
-        if self.hybrid_retrieval_enabled:
-            lexical_results = self.lexical_retriever.search(
+        if self.lexical_only:
+            raw_results = self.lexical_retriever.search(
                 query,
                 self.vector_store.all_chunks(),
-                top_k=self.lexical_candidate_k,
+                top_k=candidate_k,
             )
-            raw_results = self._fuse_candidates(
-                dense_results,
-                lexical_results,
+        else:
+            if self.embedding_service is None:
+                raise RuntimeError(
+                    "Embedding service is required for dense retrieval"
+                )
+
+            query_embedding = self.embedding_service.embed_query(query)
+
+            dense_results = self.vector_store.search(
+                query_embedding=query_embedding,
+                top_k=candidate_k,
             )
+
+            if self.hybrid_retrieval_enabled:
+                lexical_results = self.lexical_retriever.search(
+                    query,
+                    self.vector_store.all_chunks(),
+                    top_k=candidate_k,
+                )
+
+                raw_results = self._fuse_candidates(
+                    dense_results,
+                    lexical_results,
+                )
+            else:
+                raw_results = dense_results
 
         if self.reranker is not None:
             scores = self.reranker.score(
@@ -148,10 +175,7 @@ class Retriever:
                 text=result["document"],
                 distance=result["distance"],
             )
-            for rank, result in enumerate(
-                raw_results,
-                start=1,
-            )
+            for rank, result in enumerate(raw_results, start=1)
         ]
 
         latency_ms = (perf_counter() - start_time) * 1000
@@ -162,16 +186,34 @@ class Retriever:
             latency_ms=latency_ms,
         )
 
+    def _resolve_candidate_k(self, top_k: int) -> int:
+        if top_k <= 0:
+            raise ValueError("top_k must be greater than zero")
+
+        if self.candidate_k is not None:
+            return max(self.candidate_k, top_k)
+
+        if self.reranking_enabled:
+            return max(self.reranker_candidate_k, top_k)
+
+        return top_k
+
     @staticmethod
     def _fuse_candidates(
         dense_results: list[dict],
         lexical_results: list[dict],
     ) -> list[dict]:
         candidates: dict[str, tuple[float, dict]] = {}
+
         for results in (dense_results, lexical_results):
             for rank, result in enumerate(results, start=1):
                 chunk_id = result["chunk_id"]
-                score, existing = candidates.get(chunk_id, (0.0, result))
+
+                score, existing = candidates.get(
+                    chunk_id,
+                    (0.0, result),
+                )
+
                 candidates[chunk_id] = (
                     score + 1.0 / (60 + rank),
                     existing,
@@ -181,6 +223,9 @@ class Retriever:
             result
             for _, result in sorted(
                 candidates.values(),
-                key=lambda item: (-item[0], item[1]["chunk_id"]),
+                key=lambda item: (
+                    -item[0],
+                    item[1]["chunk_id"],
+                ),
             )
         ]

@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 
 data/chroma/
+
+candidate_diagnosis.json

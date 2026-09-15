@@ -73,3 +73,57 @@ def test_reranking_rescores_expanded_dense_candidates() -> None:
     assert vector_store.requested_top_k == 3
     assert [item.document_id for item in result.results] == ["b.md", "c.md"]
     assert [item.rank for item in result.results] == [1, 2]
+
+def test_explicit_candidate_k_controls_dense_candidate_pool() -> None:
+    vector_store = FakeVectorStore()
+
+    retriever = Retriever(
+        embedding_service=FakeEmbeddingService(),
+        vector_store=vector_store,
+        reranker=FakeReranker(),
+        candidate_k=2,
+        reranker_candidate_k=10,
+    )
+
+    retriever.retrieve("query", top_k=2)
+
+    assert vector_store.requested_top_k == 2
+
+
+def test_candidate_k_cannot_be_smaller_than_top_k() -> None:
+    vector_store = FakeVectorStore()
+
+    retriever = Retriever(
+        embedding_service=FakeEmbeddingService(),
+        vector_store=vector_store,
+        reranker=FakeReranker(),
+        candidate_k=1,
+    )
+
+    retriever.retrieve("query", top_k=2)
+
+    assert vector_store.requested_top_k == 2
+
+
+def test_bm25_mode_does_not_initialize_embeddings(monkeypatch) -> None:
+    import app.retrieval.retriever as retriever_module
+
+    class FailingEmbeddingService:
+        def __init__(self) -> None:
+            raise AssertionError(
+                "Embedding service should not be initialized for BM25"
+            )
+
+    monkeypatch.setattr(
+        retriever_module,
+        "EmbeddingService",
+        FailingEmbeddingService,
+    )
+
+    retriever = Retriever(
+        vector_store=FakeVectorStore(),
+        lexical_only=True,
+    )
+
+    assert retriever.mode == "bm25"
+    assert retriever.embedding_service is None
