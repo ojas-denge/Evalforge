@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     reranking_enabled: bool = False
     reranker_candidate_k: int = 10
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+    langfuse_enabled: bool = False
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+
     hybrid_retrieval_enabled: bool = False
     lexical_candidate_k: int = 10
 

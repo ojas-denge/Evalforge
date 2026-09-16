@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from time import perf_counter
+from app.observability.tracing import Tracer
 
 from app.core.config import get_settings
 from app.retrieval.embeddings import EmbeddingService
@@ -36,8 +37,10 @@ class Retriever:
         lexical_retriever: BM25Retriever | None = None,
         lexical_only: bool = False,
         candidate_k: int | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         settings = get_settings()
+        self.tracer = tracer or Tracer()
 
         self.lexical_only = lexical_only
         self.vector_store = vector_store or VectorStore()
@@ -107,78 +110,103 @@ class Retriever:
 
     def retrieve(self, query: str, top_k: int = 5) -> RetrievalResult:
         start_time = perf_counter()
-
         candidate_k = self._resolve_candidate_k(top_k)
 
-        if self.lexical_only:
-            raw_results = self.lexical_retriever.search(
-                query,
-                self.vector_store.all_chunks(),
-                top_k=candidate_k,
-            )
-        else:
-            if self.embedding_service is None:
-                raise RuntimeError(
-                    "Embedding service is required for dense retrieval"
-                )
+        with self.tracer.retrieval(
+            name="retrieval",
+            input={"query": query},
+            metadata={
+                "mode": self.mode,
+                "candidate_k": candidate_k,
+                "top_k": top_k,
+                "reranking_enabled": self.reranking_enabled,
+                "hybrid_retrieval_enabled": self.hybrid_retrieval_enabled,
+            },
+        ) as observation:
 
-            query_embedding = self.embedding_service.embed_query(query)
-
-            dense_results = self.vector_store.search(
-                query_embedding=query_embedding,
-                top_k=candidate_k,
-            )
-
-            if self.hybrid_retrieval_enabled:
-                lexical_results = self.lexical_retriever.search(
+            if self.lexical_only:
+                raw_results = self.lexical_retriever.search(
                     query,
                     self.vector_store.all_chunks(),
                     top_k=candidate_k,
                 )
-
-                raw_results = self._fuse_candidates(
-                    dense_results,
-                    lexical_results,
-                )
             else:
-                raw_results = dense_results
+                if self.embedding_service is None:
+                    raise RuntimeError(
+                        "Embedding service is required for dense retrieval"
+                    )
 
-        if self.reranker is not None:
-            scores = self.reranker.score(
-                query,
-                [result["document"] for result in raw_results],
-            )
+                query_embedding = self.embedding_service.embed_query(query)
 
-            if len(scores) != len(raw_results):
-                raise ValueError(
-                    "Reranker must return one score per candidate"
+                dense_results = self.vector_store.search(
+                    query_embedding=query_embedding,
+                    top_k=candidate_k,
                 )
 
-            raw_results = [
-                result
-                for _, result in sorted(
-                    enumerate(raw_results),
-                    key=lambda candidate: (
-                        -scores[candidate[0]],
-                        candidate[0],
-                    ),
-                )[:top_k]
+                if self.hybrid_retrieval_enabled:
+                    lexical_results = self.lexical_retriever.search(
+                        query,
+                        self.vector_store.all_chunks(),
+                        top_k=candidate_k,
+                    )
+
+                    raw_results = self._fuse_candidates(
+                        dense_results,
+                        lexical_results,
+                    )
+                else:
+                    raw_results = dense_results
+
+            if self.reranker is not None:
+                scores = self.reranker.score(
+                    query,
+                    [result["document"] for result in raw_results],
+                )
+
+                if len(scores) != len(raw_results):
+                    raise ValueError(
+                        "Reranker must return one score per candidate"
+                    )
+
+                raw_results = [
+                    result
+                    for _, result in sorted(
+                        enumerate(raw_results),
+                        key=lambda candidate: (
+                            -scores[candidate[0]],
+                            candidate[0],
+                        ),
+                    )[:top_k]
+                ]
+            else:
+                raw_results = raw_results[:top_k]
+
+            results = [
+                RetrievedDocument(
+                    rank=rank,
+                    chunk_id=result["chunk_id"],
+                    document_id=result["metadata"]["document_id"],
+                    text=result["document"],
+                    distance=result["distance"],
+                )
+                for rank, result in enumerate(raw_results, start=1)
             ]
-        else:
-            raw_results = raw_results[:top_k]
 
-        results = [
-            RetrievedDocument(
-                rank=rank,
-                chunk_id=result["chunk_id"],
-                document_id=result["metadata"]["document_id"],
-                text=result["document"],
-                distance=result["distance"],
-            )
-            for rank, result in enumerate(raw_results, start=1)
-        ]
+            latency_ms = (perf_counter() - start_time) * 1000
 
-        latency_ms = (perf_counter() - start_time) * 1000
+            if observation is not None:
+                observation.update(
+                    output={
+                        "result_count": len(results),
+                        "document_ids": [
+                            result.document_id
+                            for result in results
+                        ],
+                    },
+                    metadata={
+                        "latency_ms": latency_ms,
+                    },
+                )
 
         return RetrievalResult(
             query=query,

@@ -6,13 +6,15 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models.schemas import QueryRequest, QueryResponse
 from app.retrieval.retriever import Retriever
+from app.observability.tracing import Tracer
 
 
 settings = get_settings()
 configure_logging(settings.log_level)
 logger = get_logger(__name__)
 
-retriever = Retriever()
+tracer = Tracer()
+retriever = Retriever(tracer=tracer)
 
 
 @asynccontextmanager
@@ -47,27 +49,46 @@ def health_check():
 
 @app.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest):
-    logger.info(
-        "Query received: %s",
-        request.question,
-    )
+    with tracer.trace(
+        name="rag_request",
+        input={"question": request.question},
+        metadata={
+            "endpoint": "/query",
+            "retrieval_top_k": 3,
+        },
+    ) as observation:
 
-    retrieval = retriever.retrieve(
-        query=request.question,
-        top_k=3,
-    )
+        logger.info(
+            "Query received: %s",
+            request.question,
+        )
 
-    citations = [
-        result.document_id
-        for result in retrieval.results
-    ]
+        retrieval = retriever.retrieve(
+            query=request.question,
+            top_k=3,
+        )
 
-    return QueryResponse(
-        answer="Retrieval successful. Generation not implemented yet.",
-        citations=citations,
-        confidence=0.0,
-        latency_ms=retrieval.latency_ms,
-        input_tokens=0,
-        output_tokens=0,
-        estimated_cost_usd=0.0,
-    )
+        citations = [
+            result.document_id
+            for result in retrieval.results
+        ]
+
+        response = QueryResponse(
+            answer="Retrieval successful. Generation not implemented yet.",
+            citations=citations,
+            confidence=0.0,
+            latency_ms=retrieval.latency_ms,
+            input_tokens=0,
+            output_tokens=0,
+            estimated_cost_usd=0.0,
+        )
+
+        if observation is not None:
+            observation.update(
+                output={
+                    "citations": citations,
+                    "retrieval_result_count": len(retrieval.results),
+                },
+            )
+
+        return response

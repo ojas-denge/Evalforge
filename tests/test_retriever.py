@@ -1,4 +1,5 @@
 from app.retrieval.retriever import Retriever
+from contextlib import contextmanager
 
 
 class FakeEmbeddingService:
@@ -41,6 +42,33 @@ class FakeVectorStore:
 class FakeReranker:
     def score(self, query: str, documents: list[str]) -> list[float]:
         return [0.2, 0.9, 0.4][: len(documents)]
+
+class FakeTracer:
+    def __init__(self) -> None:
+        self.calls = []
+
+    @contextmanager
+    def retrieval(self, name, *, input=None, metadata=None):
+        observation = FakeObservation()
+        self.calls.append(
+            {
+                "name": name,
+                "input": input,
+                "metadata": metadata,
+                "observation": observation,
+            }
+        )
+        yield observation
+
+
+class FakeObservation:
+    def __init__(self) -> None:
+        self.output = None
+        self.metadata = None
+
+    def update(self, *, output=None, metadata=None):
+        self.output = output
+        self.metadata = metadata
 
 
 def test_dense_retrieval_preserves_vector_store_order() -> None:
@@ -127,3 +155,36 @@ def test_bm25_mode_does_not_initialize_embeddings(monkeypatch) -> None:
 
     assert retriever.mode == "bm25"
     assert retriever.embedding_service is None
+
+
+def test_retrieval_emits_observability_data() -> None:
+    vector_store = FakeVectorStore()
+    tracer = FakeTracer()
+
+    retriever = Retriever(
+        embedding_service=FakeEmbeddingService(),
+        vector_store=vector_store,
+        reranking_enabled=False,
+        tracer=tracer,
+    )
+
+    result = retriever.retrieve("query", top_k=2)
+
+    assert len(tracer.calls) == 1
+
+    call = tracer.calls[0]
+
+    assert call["name"] == "retrieval"
+    assert call["input"] == {"query": "query"}
+
+    assert call["metadata"]["mode"] == "dense"
+    assert call["metadata"]["candidate_k"] == 2
+    assert call["metadata"]["top_k"] == 2
+
+    assert call["observation"].output == {
+        "result_count": 2,
+        "document_ids": ["a.md", "b.md"],
+    }
+
+    assert call["observation"].metadata["latency_ms"] >= 0
+    assert len(result.results) == 2
