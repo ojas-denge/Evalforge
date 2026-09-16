@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.evaluation import EvaluationDataset
@@ -11,7 +12,9 @@ from app.models.evaluation import (
     EvaluationResult,
     EvaluationRun,
     RetrievedEvidence,
+    RetrievalConfig,
 )
+
 from app.observability.tracing import Tracer
 from app.retrieval.retriever import Retriever
 
@@ -25,6 +28,16 @@ class Evaluator:
         self.tracer = tracer or Tracer()
         self.retriever = retriever or Retriever(
             tracer=self.tracer
+        )
+
+    def _build_retrieval_config(self) -> RetrievalConfig:
+        return RetrievalConfig(
+            mode=self.retriever.mode,
+            top_k=5,
+            candidate_k=self.retriever.candidate_k,
+            reranking_enabled=self.retriever.reranking_enabled,
+            reranker_candidate_k=self.retriever.reranker_candidate_k,
+            hybrid_retrieval_enabled=self.retriever.hybrid_retrieval_enabled,
         )
 
     def evaluate_case(
@@ -205,7 +218,9 @@ class Evaluator:
 
         return EvaluationRun(
             run_id=str(uuid4()),
+            created_at=datetime.now(timezone.utc),
             dataset_size=len(results),
+            retrieval_config=self._build_retrieval_config(),
             results=results,
             mean_hit_at_1=mean_hit_at_1,
             mean_hit_at_3=mean_hit_at_3,

@@ -36,22 +36,26 @@ def main() -> None:
                 f"{evidence.document_id} "
                 f"(distance={evidence.distance:.4f})"
                 if evidence.distance is not None
-                else "(lexical candidate)"
+                else "  (lexical candidate)"
             )
 
         print(f"Diagnostic: {result.failure_type}")
+
         print(
             "Relevant evidence found: "
             f"{'YES' if result.relevant_documents_found else 'NO'}"
         )
+
         print(
             "First relevant rank: "
             f"{result.first_relevant_rank or 'N/A'}"
         )
+
         print(
             "Missing documents: "
             + (", ".join(result.missing_documents) or "None")
         )
+
         print(
             "Confounding documents: "
             + (", ".join(result.confounding_documents) or "None")
@@ -68,7 +72,7 @@ def main() -> None:
             f"Recall@3={result.recall_at_3:.2f} "
             f"Recall@5={result.recall_at_5:.2f}"
         )
-        
+
         print(f"MRR={result.mrr:.3f}")
 
         print(
@@ -79,18 +83,66 @@ def main() -> None:
     print("AGGREGATE METRICS")
     print("=" * 80)
 
-    print(f"Mean Hit@1:    {run.mean_hit_at_1:.3f}")
-    print(f"Mean Hit@3:    {run.mean_hit_at_3:.3f}")
-    print(f"Mean Hit@5:    {run.mean_hit_at_5:.3f}")
+    print(
+        f"Mean Hit@1:    "
+        f"{run.mean_hit_at_1:.3f}"
+    )
 
-    print(f"Mean Recall@1: {run.mean_recall_at_1:.3f}")
-    print(f"Mean Recall@3: {run.mean_recall_at_3:.3f}")
-    print(f"Mean Recall@5: {run.mean_recall_at_5:.3f}")
+    print(
+        f"Mean Hit@3:    "
+        f"{run.mean_hit_at_3:.3f}"
+    )
 
-    print(f"Mean MRR:      {run.mean_mrr:.3f}")
+    print(
+        f"Mean Hit@5:    "
+        f"{run.mean_hit_at_5:.3f}"
+    )
+
+    print(
+        f"Mean Recall@1: "
+        f"{run.mean_recall_at_1:.3f}"
+    )
+
+    print(
+        f"Mean Recall@3: "
+        f"{run.mean_recall_at_3:.3f}"
+    )
+
+    print(
+        f"Mean Recall@5: "
+        f"{run.mean_recall_at_5:.3f}"
+    )
+
+    print(
+        f"Mean MRR:      "
+        f"{run.mean_mrr:.3f}"
+    )
+
     print(
         "Mean retrieval latency: "
         f"{run.mean_retrieval_latency_ms:.2f} ms"
+    )
+
+    print("=" * 80)
+    print("RUN PROVENANCE")
+    print("=" * 80)
+
+    print(f"Run ID:       {run.run_id}")
+    print(f"Created at:   {run.created_at}")
+    print(f"Retriever:    {run.retrieval_config.mode}")
+    print(f"Top K:        {run.retrieval_config.top_k}")
+    print(f"Candidate K:  {run.retrieval_config.candidate_k}")
+    print(
+        f"Reranking:    "
+        f"{run.retrieval_config.reranking_enabled}"
+    )
+    print(
+        f"Reranker K:   "
+        f"{run.retrieval_config.reranker_candidate_k}"
+    )
+    print(
+        f"Hybrid:       "
+        f"{run.retrieval_config.hybrid_retrieval_enabled}"
     )
 
     print("=" * 80)

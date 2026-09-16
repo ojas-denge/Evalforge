@@ -1,5 +1,11 @@
+from datetime import datetime, timezone
+
 from app.evaluation.comparison import compare_runs
-from app.models.evaluation import EvaluationResult, EvaluationRun
+from app.models.evaluation import (
+    EvaluationResult,
+    EvaluationRun,
+    RetrievalConfig,
+)
 
 
 def make_result(
@@ -47,6 +53,15 @@ def make_run(
         mean_mrr=sum(r.mrr for r in results) / len(results),
         mean_retrieval_latency_ms=(
             sum(r.retrieval_latency_ms for r in results) / len(results)
+        ),
+        created_at=datetime.now(timezone.utc),
+        retrieval_config=RetrievalConfig(
+            mode="dense",
+            top_k=5,
+            candidate_k=None,
+            reranking_enabled=False,
+            reranker_candidate_k=None,
+            hybrid_retrieval_enabled=False,
         ),
     )
 
