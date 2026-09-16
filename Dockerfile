@@ -6,6 +6,7 @@ COPY pyproject.toml .
 COPY app ./app
 COPY scripts ./scripts
 COPY data ./data
+COPY evaluation_baselines ./evaluation_baselines
 
 # Install CPU-only PyTorch first.
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
