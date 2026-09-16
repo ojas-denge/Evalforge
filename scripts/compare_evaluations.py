@@ -1,9 +1,11 @@
-﻿from app.evaluation.comparison import compare_runs
+﻿from app.evaluation.ci_gate import EvaluationCIGate
+from app.evaluation.comparison import compare_runs
 from app.evaluation.dataset import EvaluationDataset
 from app.evaluation.regression import RegressionPolicy
 from app.evaluation.reporting import print_comparison
 from app.evaluation.runner import Evaluator
 from app.retrieval.retriever import Retriever
+
 
 def main():
     dataset = EvaluationDataset.load(
@@ -43,7 +45,8 @@ def main():
         max_latency_increase_ms=100.0,
     )
 
-    regression = policy.evaluate(comparison)
+    gate = EvaluationCIGate(policy)
+    gate_result = gate.evaluate(comparison)
 
     print("\n================================")
     print("        EVALFORGE COMPARISON")
@@ -54,18 +57,18 @@ def main():
 
     print_comparison(comparison)
 
-    print("\n=== Regression Policy ===")
-    print(
-        f"Regression detected: "
-        f"{regression.regression_detected}"
-    )
+    print("\n=== CI Gate ===")
+    print(f"Passed: {gate_result.passed}")
 
-    if regression.reasons:
+    if gate_result.reasons:
         print("Reasons:")
-        for reason in regression.reasons:
+        for reason in gate_result.reasons:
             print(f"  - {reason}")
     else:
         print("Reasons: none")
+
+    if not gate_result.passed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
