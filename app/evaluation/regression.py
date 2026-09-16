@@ -14,12 +14,15 @@ class RegressionPolicy:
         self,
         *,
         max_mrr_drop: float = 0.0,
-        max_latency_increase_ms: float = 0.0,
+        max_latency_increase_ms: float | None = 0.0,
     ) -> None:
         if max_mrr_drop < 0:
             raise ValueError("max_mrr_drop must be non-negative")
 
-        if max_latency_increase_ms < 0:
+        if (
+            max_latency_increase_ms is not None
+            and max_latency_increase_ms < 0
+        ):
             raise ValueError(
                 "max_latency_increase_ms must be non-negative"
             )
@@ -42,7 +45,10 @@ class RegressionPolicy:
             "mean_retrieval_latency_ms"
         ]
 
-        if latency_delta > self.max_latency_increase_ms:
+        if (
+            self.max_latency_increase_ms is not None
+            and latency_delta > self.max_latency_increase_ms
+        ):
             reasons.append("mean_retrieval_latency_ms")
 
         return RegressionResult(

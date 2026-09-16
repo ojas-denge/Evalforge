@@ -212,4 +212,40 @@ def test_regression_policy_allows_changes_within_thresholds():
     result = policy.evaluate(comparison)
 
     assert result.regression_detected is False
+    assert result.reasons == [] 
+
+def test_regression_policy_can_disable_latency_gating():
+    baseline = make_run(
+        "baseline",
+        [
+            make_result(
+                "case-1",
+                hit_at_1=1.0,
+                mrr=1.0,
+                latency=100.0,
+            )
+        ],
+    )
+
+    candidate = make_run(
+        "candidate",
+        [
+            make_result(
+                "case-1",
+                hit_at_1=1.0,
+                mrr=1.0,
+                latency=500.0,
+            )
+        ],
+    )
+
+    comparison = compare_runs(baseline, candidate)
+
+    policy = RegressionPolicy(
+        max_latency_increase_ms=None,
+    )
+
+    result = policy.evaluate(comparison)
+
+    assert result.regression_detected is False
     assert result.reasons == []
