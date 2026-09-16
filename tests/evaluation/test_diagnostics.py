@@ -1,6 +1,6 @@
 import pytest
 
-from app.evaluation_diagnostics import analyze_retrieval
+from app.evaluation.diagnostics import analyze_retrieval
 
 
 @pytest.mark.parametrize(

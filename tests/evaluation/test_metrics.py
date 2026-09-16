@@ -1,5 +1,5 @@
 def test_reciprocal_rank_at_rank_1():
-    from app.evaluation_metrics import reciprocal_rank
+    from app.evaluation.metrics import reciprocal_rank
 
     assert reciprocal_rank(
         ["doc-a"],
@@ -8,7 +8,7 @@ def test_reciprocal_rank_at_rank_1():
 
 
 def test_reciprocal_rank_at_rank_2():
-    from app.evaluation_metrics import reciprocal_rank
+    from app.evaluation.metrics import reciprocal_rank
 
     assert reciprocal_rank(
         ["doc-a"],
@@ -17,7 +17,7 @@ def test_reciprocal_rank_at_rank_2():
 
 
 def test_reciprocal_rank_at_rank_3():
-    from app.evaluation_metrics import reciprocal_rank
+    from app.evaluation.metrics import reciprocal_rank
 
     assert reciprocal_rank(
         ["doc-a"],
@@ -26,7 +26,7 @@ def test_reciprocal_rank_at_rank_3():
 
 
 def test_reciprocal_rank_when_not_retrieved():
-    from app.evaluation_metrics import reciprocal_rank
+    from app.evaluation.metrics import reciprocal_rank
 
     assert reciprocal_rank(
         ["doc-a"],
@@ -35,7 +35,7 @@ def test_reciprocal_rank_when_not_retrieved():
 
 
 def test_reciprocal_rank_uses_first_relevant_document():
-    from app.evaluation_metrics import reciprocal_rank
+    from app.evaluation.metrics import reciprocal_rank
 
     assert reciprocal_rank(
         ["doc-a", "doc-c"],

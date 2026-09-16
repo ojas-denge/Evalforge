@@ -1,8 +1,8 @@
 from uuid import uuid4
 
 from app.evaluation import EvaluationDataset
-from app.evaluation_diagnostics import analyze_retrieval
-from app.evaluation_metrics import (
+from app.evaluation.diagnostics import analyze_retrieval
+from app.evaluation.metrics import (
     hit_at_k,
     recall_at_k,
     reciprocal_rank,
@@ -12,6 +12,7 @@ from app.models.evaluation import (
     EvaluationRun,
     RetrievedEvidence,
 )
+from app.observability.tracing import Tracer
 from app.retrieval.retriever import Retriever
 
 
@@ -19,8 +20,12 @@ class Evaluator:
     def __init__(
         self,
         retriever: Retriever | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
-        self.retriever = retriever or Retriever()
+        self.tracer = tracer or Tracer()
+        self.retriever = retriever or Retriever(
+            tracer=self.tracer
+        )
 
     def evaluate_case(
         self,
@@ -102,6 +107,43 @@ class Evaluator:
         )
 
     def evaluate_dataset(
+        self,
+        dataset: EvaluationDataset,
+    ) -> EvaluationRun:
+        with self.tracer.trace(
+            name="evaluation_run",
+            input={
+                "dataset_size": len(dataset),
+            },
+            metadata={
+                "retriever_mode": self.retriever.mode,
+                "retrieval_top_k": 5,
+            },
+        ) as observation:
+
+            run = self._evaluate_dataset(dataset)
+
+            if observation is not None:
+                observation.update(
+                    output={
+                        "run_id": run.run_id,
+                        "dataset_size": run.dataset_size,
+                        "mean_hit_at_1": run.mean_hit_at_1,
+                        "mean_hit_at_3": run.mean_hit_at_3,
+                        "mean_hit_at_5": run.mean_hit_at_5,
+                        "mean_recall_at_1": run.mean_recall_at_1,
+                        "mean_recall_at_3": run.mean_recall_at_3,
+                        "mean_recall_at_5": run.mean_recall_at_5,
+                        "mean_mrr": run.mean_mrr,
+                        "mean_retrieval_latency_ms": (
+                            run.mean_retrieval_latency_ms
+                        ),
+                    },
+                )
+
+            return run
+
+    def _evaluate_dataset(
         self,
         dataset: EvaluationDataset,
     ) -> EvaluationRun:

@@ -1,5 +1,5 @@
 from app.evaluation import EvaluationDataset
-from app.evaluator import Evaluator
+from app.evaluation.runner import Evaluator
 
 
 def main() -> None:

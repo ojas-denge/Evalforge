@@ -3,7 +3,7 @@ import json
 from collections import Counter
 
 from app.evaluation import EvaluationDataset
-from app.evaluator import Evaluator
+from app.evaluation.runner import Evaluator
 from app.retrieval.retriever import Retriever
 
 
