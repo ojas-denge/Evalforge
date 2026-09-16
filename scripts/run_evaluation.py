@@ -7,6 +7,7 @@ def main() -> None:
     evaluator = Evaluator()
 
     run = evaluator.evaluate_dataset(dataset)
+    evaluator.tracer.flush()
 
     print("=" * 80)
     print("EVALFORGE RETRIEVAL EVALUATION")
