@@ -59,6 +59,8 @@ jobs:
       - name: Run tests
         run: pytest -q
 
+      - name: Ingest evaluation corpus
+        run: python scripts/ingest.py
+
       - name: Run retrieval evaluation
         run: python scripts/run_ci_evaluation.py
-
