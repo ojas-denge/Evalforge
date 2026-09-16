@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from app.db.repository import EvaluationRepository
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
@@ -15,6 +16,7 @@ logger = get_logger(__name__)
 
 tracer = Tracer()
 retriever = Retriever(tracer=tracer)
+evaluation_repository = EvaluationRepository()
 
 
 @asynccontextmanager
@@ -92,3 +94,20 @@ def query(request: QueryRequest):
             )
 
         return response
+
+@app.get("/evaluations")
+def list_evaluations():
+    return evaluation_repository.list_runs()
+
+
+@app.get("/evaluations/{run_id}")
+def get_evaluation(run_id: str):
+    run = evaluation_repository.get_run(run_id)
+
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Evaluation run not found: {run_id}",
+        )
+
+    return run
