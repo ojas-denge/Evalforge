@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.db.repository import EvaluationRepository
 from app.evaluation import EvaluationDataset
 from app.evaluation.diagnostics import analyze_retrieval
 from app.evaluation.metrics import (
@@ -14,7 +15,6 @@ from app.models.evaluation import (
     RetrievedEvidence,
     RetrievalConfig,
 )
-
 from app.observability.tracing import Tracer
 from app.retrieval.retriever import Retriever
 
@@ -24,11 +24,13 @@ class Evaluator:
         self,
         retriever: Retriever | None = None,
         tracer: Tracer | None = None,
+        repository: EvaluationRepository | None = None,
     ) -> None:
         self.tracer = tracer or Tracer()
         self.retriever = retriever or Retriever(
             tracer=self.tracer
         )
+        self.repository = repository or EvaluationRepository()
 
     def _build_retrieval_config(self) -> RetrievalConfig:
         return RetrievalConfig(
@@ -135,6 +137,7 @@ class Evaluator:
         ) as observation:
 
             run = self._evaluate_dataset(dataset)
+            self.repository.save_run(run)
 
             if observation is not None:
                 observation.update(

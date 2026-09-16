@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
 
+    database_url: str = (
+        "postgresql+psycopg://evalforge:evalforge@localhost:5432/evalforge"
+    )
+
     hybrid_retrieval_enabled: bool = False
     lexical_candidate_k: int = 10
 

@@ -5,5 +5,29 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://evalforge:evalforge@postgres:5432/evalforge
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./data:/app/data
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: evalforge
+      POSTGRES_USER: evalforge
+      POSTGRES_PASSWORD: evalforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evalforge -d evalforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
