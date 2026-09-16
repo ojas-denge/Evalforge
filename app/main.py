@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.db.repository import EvaluationRepository
 from app.evaluation.comparison import compare_runs
+from app.evaluation.regression import RegressionPolicy
 from app.models.schemas import QueryRequest, QueryResponse
 from app.observability.tracing import Tracer
 from app.retrieval.retriever import Retriever
@@ -154,4 +155,17 @@ def compare_evaluations(
         candidate,
     )
 
-    return comparison
+    policy = RegressionPolicy(
+        max_mrr_drop=0.02,
+        max_latency_increase_ms=100.0,
+    )
+
+    regression = policy.evaluate(comparison)
+
+    return {
+        "baseline_run_id": comparison.baseline_run_id,
+        "candidate_run_id": comparison.candidate_run_id,
+        "metric_deltas": comparison.metric_deltas,
+        "case_changes": comparison.case_changes,
+        "regression": regression,
+    }
