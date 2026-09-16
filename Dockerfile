@@ -4,7 +4,13 @@ WORKDIR /app
 
 COPY pyproject.toml .
 COPY app ./app
+COPY scripts ./scripts
+COPY data ./data
 
+# Install CPU-only PyTorch first.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+
+# Install EvalForge dependencies.
 RUN pip install --no-cache-dir .
 
 EXPOSE 8000

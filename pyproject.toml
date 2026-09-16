@@ -17,6 +17,7 @@ dependencies = [
     "sentence-transformers>=6.0,<7.0",
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
+    "langfuse>=4.15,<5.0",
 ]
 
 [project.optional-dependencies]

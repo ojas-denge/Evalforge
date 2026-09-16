@@ -1,0 +1,63 @@
+name: EvalForge CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test-and-evaluate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: evalforge
+          POSTGRES_USER: evalforge
+          POSTGRES_PASSWORD: evalforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U evalforge -d evalforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://evalforge:evalforge@localhost:5432/evalforge
+      LANGFUSE_ENABLED: "false"
+      APP_ENV: test
+      LOG_LEVEL: INFO
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CPU PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+
+      - name: Install EvalForge
+        run: pip install .
+
+      - name: Install test dependencies
+        run: pip install ".[test]"
+
+      - name: Initialize database
+        run: python -c "from app.db.session import init_db; init_db()"
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Run retrieval evaluation
+        run: python scripts/run_evaluation.py
