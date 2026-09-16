@@ -1,13 +1,14 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from app.db.repository import EvaluationRepository
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.db.repository import EvaluationRepository
+from app.evaluation.comparison import compare_runs
 from app.models.schemas import QueryRequest, QueryResponse
-from app.retrieval.retriever import Retriever
 from app.observability.tracing import Tracer
+from app.retrieval.retriever import Retriever
 
 
 settings = get_settings()
@@ -16,7 +17,6 @@ logger = get_logger(__name__)
 
 tracer = Tracer()
 retriever = Retriever(tracer=tracer)
-evaluation_repository = EvaluationRepository()
 
 
 @asynccontextmanager
@@ -95,14 +95,19 @@ def query(request: QueryRequest):
 
         return response
 
+
 @app.get("/evaluations")
 def list_evaluations():
-    return evaluation_repository.list_runs()
+    repository = EvaluationRepository()
+
+    return repository.list_runs()
 
 
 @app.get("/evaluations/{run_id}")
 def get_evaluation(run_id: str):
-    run = evaluation_repository.get_run(run_id)
+    repository = EvaluationRepository()
+
+    run = repository.get_run(run_id)
 
     if run is None:
         raise HTTPException(
@@ -111,3 +116,42 @@ def get_evaluation(run_id: str):
         )
 
     return run
+
+
+@app.get(
+    "/evaluations/{baseline_run_id}/compare/{candidate_run_id}"
+)
+def compare_evaluations(
+    baseline_run_id: str,
+    candidate_run_id: str,
+):
+    repository = EvaluationRepository()
+
+    baseline = repository.get_run(baseline_run_id)
+
+    if baseline is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Baseline evaluation run not found: "
+                f"{baseline_run_id}"
+            ),
+        )
+
+    candidate = repository.get_run(candidate_run_id)
+
+    if candidate is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Candidate evaluation run not found: "
+                f"{candidate_run_id}"
+            ),
+        )
+
+    comparison = compare_runs(
+        baseline,
+        candidate,
+    )
+
+    return comparison
