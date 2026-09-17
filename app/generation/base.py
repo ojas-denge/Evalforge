@@ -27,6 +27,7 @@ class GenerationResult:
     estimated_cost_usd: float
     latency_ms: float
     finish_reason: str | None = None
+    structured_output: dict[str, Any] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
