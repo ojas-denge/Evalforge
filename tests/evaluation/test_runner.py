@@ -1,7 +1,12 @@
+﻿from app.evaluation.answer_judge import AnswerJudge
 from app.evaluation.runner import Evaluator
 from app.generation.base import GenerationResult
 from app.generation.usage import GenerationUsage
-from app.models.evaluation import EvaluationCase, RetrievedEvidence
+from app.models.evaluation import (
+    AnswerJudgeResult,
+    EvaluationCase,
+    RetrievedEvidence,
+)
 
 
 class FakeObservation:
@@ -88,6 +93,39 @@ class FakeGenerator:
             estimated_cost_usd=0.001,
             latency_ms=5.0,
             finish_reason="stop",
+        )
+
+
+class FakeAnswerJudge:
+    def __init__(self):
+        self.calls = []
+
+    def judge(
+        self,
+        *,
+        question,
+        expected_answer,
+        expected_topics,
+        generated_answer,
+        retrieved_evidence,
+    ):
+        self.calls.append(
+            {
+                "question": question,
+                "expected_answer": expected_answer,
+                "expected_topics": expected_topics,
+                "generated_answer": generated_answer,
+                "retrieved_evidence": retrieved_evidence,
+            }
+        )
+
+        return AnswerJudgeResult(
+            answer_correct=True,
+            answer_grounded=True,
+            topics_covered=expected_topics,
+            topics_missing=[],
+            unsupported_claims=[],
+            reasoning="The generated answer matches the reference and evidence.",
         )
 
 
@@ -208,3 +246,52 @@ def test_evaluate_case_topic_coverage_is_none_without_topics():
         "observability platform."
     )
     assert result.topic_coverage is None
+
+
+def test_evaluate_case_records_answer_judge_result():
+    answer_judge = FakeAnswerJudge()
+
+    evaluator = Evaluator(
+        retriever=FakeRetriever(),
+        generator=FakeGenerator(),
+        answer_judge=answer_judge,
+    )
+
+    result = evaluator.evaluate_case(
+        make_case(
+            expected_topics=[
+                "LLM evaluation",
+                "observability",
+            ]
+        )
+    )
+
+    assert len(answer_judge.calls) == 1
+
+    call = answer_judge.calls[0]
+
+    assert call["question"] == "What is EvalForge?"
+    assert call["expected_answer"] == (
+        "EvalForge is an LLM evaluation and "
+        "observability platform."
+    )
+    assert call["expected_topics"] == [
+        "LLM evaluation",
+        "observability",
+    ]
+    assert call["generated_answer"] == (
+        "EvalForge is an LLM evaluation and "
+        "observability platform."
+    )
+    assert len(call["retrieved_evidence"]) == 1
+    assert call["retrieved_evidence"][0].document_id == "doc-1"
+
+    assert result.answer_judge is not None
+    assert result.answer_judge.answer_correct is True
+    assert result.answer_judge.answer_grounded is True
+    assert result.answer_judge.topics_covered == [
+        "LLM evaluation",
+        "observability",
+    ]
+    assert result.answer_judge.topics_missing == []
+    assert result.answer_judge.unsupported_claims == []

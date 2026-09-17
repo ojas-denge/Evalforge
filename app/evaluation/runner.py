@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.core.config import get_settings
 from app.db.repository import EvaluationRepository
 from app.evaluation import EvaluationDataset
+from app.evaluation.answer_judge import AnswerJudge
 from app.evaluation.diagnostics import analyze_retrieval
 from app.evaluation.metrics import (
     hit_at_k,
@@ -26,25 +27,22 @@ from app.retrieval.retriever import Retriever
 class Evaluator:
     def __init__(
         self,
-        retriever: Retriever | None = None,
-        generator: Generator | None = None,
-        tracer: Tracer | None = None,
-        repository: EvaluationRepository | None = None,
-    ) -> None:
+        retriever=None,
+        generator=None,
+        tracer=None,
+        repository=None,
+        answer_judge: AnswerJudge | None = None,
+    ):
         self.tracer = tracer or Tracer()
-
-        self.retriever = retriever or Retriever(
-            tracer=self.tracer
-        )
-
+        self.retriever = retriever or Retriever(tracer=self.tracer)
         self.generator = generator or create_generator(
             settings=get_settings(),
             tracer=self.tracer,
         )
-
         self.repository = repository or EvaluationRepository()
+        self.answer_judge = answer_judge
 
-    def _build_retrieval_config(self) -> RetrievalConfig:
+    def _build_retrieval_config(self):
         return RetrievalConfig(
             mode=self.retriever.mode,
             top_k=5,
@@ -54,10 +52,7 @@ class Evaluator:
             hybrid_retrieval_enabled=self.retriever.hybrid_retrieval_enabled,
         )
 
-    def evaluate_case(
-        self,
-        case,
-    ) -> EvaluationResult:
+    def evaluate_case(self, case):
         retrieval = self.retriever.retrieve(
             query=case.question,
             top_k=5,
@@ -91,9 +86,7 @@ class Evaluator:
             temperature=0.0,
         )
 
-        generation = self.generator.generate(
-            generation_request
-        )
+        generation = self.generator.generate(generation_request)
 
         case_topic_coverage = None
 
@@ -103,49 +96,59 @@ class Evaluator:
                 generation.answer,
             )
 
+        judged_answer = None
+
+        if self.answer_judge is not None:
+            judged_answer = self.answer_judge.judge(
+                question=case.question,
+                expected_answer=case.expected_answer,
+                expected_topics=case.expected_topics,
+                generated_answer=generation.answer,
+                retrieved_evidence=retrieved_evidence,
+            )
+
         return EvaluationResult(
             case_id=case.case_id,
             question=case.question,
             expected_documents=case.expected_documents,
             generated_answer=generation.answer,
             topic_coverage=case_topic_coverage,
+            answer_judge=judged_answer,
             retrieved_evidence=retrieved_evidence,
             failure_type=diagnostic.failure_type,
-            relevant_documents_found=(
-                diagnostic.relevant_documents_found
-            ),
+            relevant_documents_found=diagnostic.relevant_documents_found,
             first_relevant_rank=diagnostic.first_relevant_rank,
             missing_documents=diagnostic.missing_documents,
             confounding_documents=diagnostic.confounding_documents,
             hit_at_1=hit_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=1,
+                1,
             ),
             hit_at_3=hit_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=3,
+                3,
             ),
             hit_at_5=hit_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=5,
+                5,
             ),
             recall_at_1=recall_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=1,
+                1,
             ),
             recall_at_3=recall_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=3,
+                3,
             ),
             recall_at_5=recall_at_k(
                 case.expected_documents,
                 retrieved_documents,
-                k=5,
+                5,
             ),
             mrr=reciprocal_rank(
                 case.expected_documents,
@@ -154,28 +157,23 @@ class Evaluator:
             retrieval_latency_ms=retrieval.latency_ms,
         )
 
-    def evaluate_dataset(
-        self,
-        dataset: EvaluationDataset,
-    ) -> EvaluationRun:
+    def evaluate_dataset(self, dataset):
         with self.tracer.trace(
             name="evaluation_run",
-            input={
-                "dataset_size": len(dataset),
-            },
+            input={"dataset_size": len(dataset)},
             metadata={
                 "retriever_mode": self.retriever.mode,
                 "retrieval_top_k": 5,
+                "answer_judge_enabled": self.answer_judge is not None,
             },
         ) as observation:
-
             run = self._evaluate_dataset(dataset)
+
             self.repository.save_run(run)
 
             if observation is not None:
                 observation.update(
                     output={
-                        "run_id": run.run_id,
                         "dataset_size": run.dataset_size,
                         "mean_hit_at_1": run.mean_hit_at_1,
                         "mean_hit_at_3": run.mean_hit_at_3,
@@ -187,18 +185,12 @@ class Evaluator:
                         "mean_topic_coverage": (
                             run.mean_topic_coverage
                         ),
-                        "mean_retrieval_latency_ms": (
-                            run.mean_retrieval_latency_ms
-                        ),
-                    },
+                    }
                 )
 
             return run
 
-    def _evaluate_dataset(
-        self,
-        dataset: EvaluationDataset,
-    ) -> EvaluationRun:
+    def _evaluate_dataset(self, dataset):
         results = [
             self.evaluate_case(case)
             for case in dataset.cases
@@ -206,38 +198,31 @@ class Evaluator:
 
         if results:
             mean_hit_at_1 = sum(
-                result.hit_at_1
-                for result in results
+                result.hit_at_1 for result in results
             ) / len(results)
 
             mean_hit_at_3 = sum(
-                result.hit_at_3
-                for result in results
+                result.hit_at_3 for result in results
             ) / len(results)
 
             mean_hit_at_5 = sum(
-                result.hit_at_5
-                for result in results
+                result.hit_at_5 for result in results
             ) / len(results)
 
             mean_recall_at_1 = sum(
-                result.recall_at_1
-                for result in results
+                result.recall_at_1 for result in results
             ) / len(results)
 
             mean_recall_at_3 = sum(
-                result.recall_at_3
-                for result in results
+                result.recall_at_3 for result in results
             ) / len(results)
 
             mean_recall_at_5 = sum(
-                result.recall_at_5
-                for result in results
+                result.recall_at_5 for result in results
             ) / len(results)
 
             mean_mrr = sum(
-                result.mrr
-                for result in results
+                result.mrr for result in results
             ) / len(results)
 
             topic_scores = [
@@ -271,7 +256,7 @@ class Evaluator:
         return EvaluationRun(
             run_id=str(uuid4()),
             created_at=datetime.now(timezone.utc),
-            dataset_size=len(results),
+            dataset_size=len(dataset),
             retrieval_config=self._build_retrieval_config(),
             results=results,
             mean_hit_at_1=mean_hit_at_1,
