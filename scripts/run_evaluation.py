@@ -10,7 +10,7 @@ def main() -> None:
     evaluator.tracer.flush()
 
     print("=" * 80)
-    print("EVALFORGE RETRIEVAL EVALUATION")
+    print("EVALFORGE EVALUATION")
     print("=" * 80)
 
     print(f"Run ID:  {run.run_id}")
@@ -27,6 +27,18 @@ def main() -> None:
             "Expected:  "
             + ", ".join(result.expected_documents)
         )
+
+        if result.generated_answer is not None:
+            print(
+                "Generated answer: "
+                f"{result.generated_answer}"
+            )
+
+        if result.topic_coverage is not None:
+            print(
+                "Topic coverage: "
+                f"{result.topic_coverage:.2f}"
+            )
 
         print("Retrieved:")
 
@@ -116,6 +128,15 @@ def main() -> None:
     print(
         f"Mean MRR:      "
         f"{run.mean_mrr:.3f}"
+    )
+
+    print(
+        "Mean topic coverage: "
+        + (
+            f"{run.mean_topic_coverage:.3f}"
+            if run.mean_topic_coverage is not None
+            else "N/A"
+        )
     )
 
     print(

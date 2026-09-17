@@ -19,6 +19,7 @@ def reciprocal_rank(
 
     return 0.0
 
+
 def hit_at_k(
     expected_documents: Sequence[str],
     retrieved_documents: Sequence[str],
@@ -59,3 +60,23 @@ def recall_at_k(
     )
 
     return relevant_retrieved / len(expected_documents)
+
+
+def topic_coverage(
+    expected_topics: Sequence[str],
+    answer: str,
+) -> float:
+    if not expected_topics:
+        raise ValueError("expected_topics cannot be empty")
+
+    if not answer:
+        raise ValueError("answer cannot be empty")
+
+    normalized_answer = answer.casefold()
+
+    matched_topics = sum(
+        topic.casefold() in normalized_answer
+        for topic in expected_topics
+    )
+
+    return matched_topics / len(expected_topics)

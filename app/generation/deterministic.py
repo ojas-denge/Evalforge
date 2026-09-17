@@ -37,11 +37,13 @@ class DeterministicGenerator(Generator):
             },
         ) as observation:
 
-            answer = (
-                request.context[0].text
-                if request.context
-                else "No relevant context was retrieved."
-            )
+            if request.context:
+                answer = "\n\n".join(
+                    document.text
+                    for document in request.context
+                )
+            else:
+                answer = "No relevant context was retrieved."
 
             latency_ms = (perf_counter() - start_time) * 1000
 

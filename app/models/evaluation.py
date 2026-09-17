@@ -48,6 +48,16 @@ class EvaluationResult(BaseModel):
         min_length=1
     )
 
+    generated_answer: str | None = Field(
+        default=None
+    )
+
+    topic_coverage: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+    )
+
     retrieved_evidence: list[RetrievedEvidence] = Field(
         default_factory=list
     )
@@ -150,6 +160,12 @@ class EvaluationRun(BaseModel):
     )
 
     mean_mrr: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+    mean_topic_coverage: float | None = Field(
+        default=None,
         ge=0.0,
         le=1.0,
     )

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.core.config import get_settings
 from app.db.repository import EvaluationRepository
 from app.evaluation import EvaluationDataset
 from app.evaluation.diagnostics import analyze_retrieval
@@ -8,7 +9,10 @@ from app.evaluation.metrics import (
     hit_at_k,
     recall_at_k,
     reciprocal_rank,
+    topic_coverage,
 )
+from app.generation.base import GenerationRequest, Generator
+from app.generation.factory import create_generator
 from app.models.evaluation import (
     EvaluationResult,
     EvaluationRun,
@@ -23,13 +27,21 @@ class Evaluator:
     def __init__(
         self,
         retriever: Retriever | None = None,
+        generator: Generator | None = None,
         tracer: Tracer | None = None,
         repository: EvaluationRepository | None = None,
     ) -> None:
         self.tracer = tracer or Tracer()
+
         self.retriever = retriever or Retriever(
             tracer=self.tracer
         )
+
+        self.generator = generator or create_generator(
+            settings=get_settings(),
+            tracer=self.tracer,
+        )
+
         self.repository = repository or EvaluationRepository()
 
     def _build_retrieval_config(self) -> RetrievalConfig:
@@ -72,10 +84,31 @@ class Evaluator:
             retrieved_documents,
         )
 
+        generation_request = GenerationRequest(
+            question=case.question,
+            context=retrieval.results,
+            model=None,
+            temperature=0.0,
+        )
+
+        generation = self.generator.generate(
+            generation_request
+        )
+
+        case_topic_coverage = None
+
+        if case.expected_topics:
+            case_topic_coverage = topic_coverage(
+                case.expected_topics,
+                generation.answer,
+            )
+
         return EvaluationResult(
             case_id=case.case_id,
             question=case.question,
             expected_documents=case.expected_documents,
+            generated_answer=generation.answer,
+            topic_coverage=case_topic_coverage,
             retrieved_evidence=retrieved_evidence,
             failure_type=diagnostic.failure_type,
             relevant_documents_found=(
@@ -151,6 +184,9 @@ class Evaluator:
                         "mean_recall_at_3": run.mean_recall_at_3,
                         "mean_recall_at_5": run.mean_recall_at_5,
                         "mean_mrr": run.mean_mrr,
+                        "mean_topic_coverage": (
+                            run.mean_topic_coverage
+                        ),
                         "mean_retrieval_latency_ms": (
                             run.mean_retrieval_latency_ms
                         ),
@@ -204,6 +240,18 @@ class Evaluator:
                 for result in results
             ) / len(results)
 
+            topic_scores = [
+                result.topic_coverage
+                for result in results
+                if result.topic_coverage is not None
+            ]
+
+            mean_topic_coverage = (
+                sum(topic_scores) / len(topic_scores)
+                if topic_scores
+                else None
+            )
+
             mean_retrieval_latency_ms = sum(
                 result.retrieval_latency_ms
                 for result in results
@@ -217,6 +265,7 @@ class Evaluator:
             mean_recall_at_3 = 0.0
             mean_recall_at_5 = 0.0
             mean_mrr = 0.0
+            mean_topic_coverage = None
             mean_retrieval_latency_ms = 0.0
 
         return EvaluationRun(
@@ -232,5 +281,6 @@ class Evaluator:
             mean_recall_at_3=mean_recall_at_3,
             mean_recall_at_5=mean_recall_at_5,
             mean_mrr=mean_mrr,
+            mean_topic_coverage=mean_topic_coverage,
             mean_retrieval_latency_ms=mean_retrieval_latency_ms,
         )
