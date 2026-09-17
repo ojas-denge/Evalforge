@@ -9,8 +9,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
-    openai_api_key: str | None = None
-    llm_model: str = "gpt-4.1-mini"
+    llm_provider: str = "deterministic"
+    llm_model: str = "deterministic-test"
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+
     embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     chunk_size: int = 120

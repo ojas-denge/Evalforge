@@ -61,6 +61,26 @@ class Tracer:
         ) as observation:
             yield observation
 
+    @contextmanager
+    def generation(
+        self,
+        name: str,
+        *,
+        input: Any = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Iterator[Any]:
+        if not self.enabled:
+            yield None
+            return
+
+        with self.client.start_as_current_observation(
+            name=name,
+            as_type="generation",
+            input=input,
+            metadata=metadata,
+        ) as observation:
+            yield observation
+
     def flush(self) -> None:
         if self.client is not None:
             self.client.flush()
